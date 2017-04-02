@@ -1,0 +1,63 @@
+Technical implementations
+Incorrectly filtered escape characters
+
+This form of SQL injection occurs when user input is not filtered for escape characters and is then passed into an SQL statement. This results in the potential manipulation of the statements performed on the database by the end-user of the application.
+
+The following line of code illustrates this vulnerability:
+
+statement = "SELECT * FROM users WHERE name = '" + userName + "';"
+
+This SQL code is designed to pull up the records of the specified username from its table of users. However, if the "userName" variable is crafted in a specific way by a malicious user, the SQL statement may do more than the code author intended. For example, setting the "userName" variable as:
+
+' OR '1'='1
+
+or using comments to even block the rest of the query (there are three types of SQL comments[13]). All three lines have a space at the end:
+
+' OR '1'='1' --
+' OR '1'='1' ({
+' OR '1'='1' /* 
+
+renders one of the following SQL statements by the parent language:
+
+SELECT * FROM users WHERE name = '' OR '1'='1';
+
+SELECT * FROM users WHERE name = '' OR '1'='1' -- ';
+
+If this code were to be used in an authentication procedure then this example could be used to force the selection of every data field (*) from all users rather than from one specific user name as the coder intended, because the evaluation of '1'='1' is always true (short-circuit evaluation).
+
+The following value of "userName" in the statement below would cause the deletion of the "users" table as well as the selection of all data from the "userinfo" table (in essence revealing the information of every user), using an API that allows multiple statements:
+
+a';DROP TABLE users; SELECT * FROM userinfo WHERE 't' = 't'
+
+This input renders the final SQL statement as follows and specified:
+
+SELECT * FROM users WHERE name = 'a';DROP TABLE users; SELECT * FROM userinfo WHERE 't' = 't';
+
+While most SQL server implementations allow multiple statements to be executed with one call in this way, some SQL APIs such as PHP's mysql_query() function do not allow this for security reasons. This prevents attackers from injecting entirely separate queries, but doesn't stop them from modifying queries.
+Incorrect type handling
+
+This form of SQL injection occurs when a user-supplied field is not strongly typed or is not checked for type constraints. This could take place when a numeric field is to be used in a SQL statement, but the programmer makes no checks to validate that the user supplied input is numeric. For example:
+
+statement := "SELECT * FROM userinfo WHERE id =" + a_variable + ";"
+
+It is clear from this statement that the author intended a_variable to be a number correlating to the "id" field. However, if it is in fact a string then the end-user may manipulate the statement as they choose, thereby bypassing the need for escape characters. For example, setting a_variable to
+
+1;DROP TABLE users
+
+will drop (delete) the "users" table from the database, since the SQL becomes:
+
+SELECT * FROM userinfo WHERE id=1; DROP TABLE users;
+
+Blind SQL injection
+
+Blind SQL Injection is used when a web application is vulnerable to an SQL injection but the results of the injection are not visible to the attacker. The page with the vulnerability may not be one that displays data but will display differently depending on the results of a logical statement injected into the legitimate SQL statement called for that page. This type of attack has traditionally been considered time-intensive because a new statement needed to be crafted for each bit recovered, and depending on its structure, the attack may consist of many unsuccessful requests. Recent advancements have allowed each request to recover multiple bits, with no unsuccessful requests, allowing for more consistent and efficient extraction. [14] There are several tools that can automate these attacks once the location of the vulnerability and the target information has been established.[15]
+Conditional responses
+
+One type of blind SQL injection forces the database to evaluate a logical statement on an ordinary application screen. As an example, a book review website uses a query string to determine which book review to display. So the URL http://books.example.com/showReview.php?ID=5 would cause the server to run the query
+
+SELECT * FROM bookreviews WHERE ID = 'Value(ID)';
+
+from which it would populate the review page with data from the review with ID 5, stored in the table bookreviews. The query happens completely on the server; the user does not know the names of the database, table, or fields, nor does the user know the query string. The user only sees that the above URL returns a book review. A hacker can load the URLs http://books.example.com/showReview.php?ID=5 OR 1=1 and http://books.example.com/showReview.php?ID=5 AND 1=2, which may result in queries
+
+SELECT * FROM bookreviews WHERE ID = '5' OR '1'='1';
+SELECT * FROM bookreviews WHERE ID = '5' AND '1'='2';
